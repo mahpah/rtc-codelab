@@ -1,62 +1,30 @@
-let serverless = null
-let alice
-let bob
-let mirror = document.querySelector('#mirror')
-let screen = document.querySelector('#screen')
-let localStream
-let initted
+var isInitiator
 
-const init = () => {
-	navigator.mediaDevices.getUserMedia({
-		video: true,
-		audio: false,
-	}).then(stream => {
-		initted = true
-		mirror.srcObject = stream
-		localStream = stream
-	})
+window.room = prompt("Enter room name:")
+
+var socket = io.connect()
+
+if (room !== "") {
+  console.log('Message from client: Asking to join room ' + room)
+  socket.emit('create or join', room)
 }
 
-const call = () => {
-	if (!initted) {
-		return
-	}
+socket.on('created', function(room, clientId) {
+  isInitiator = true
+})
 
-	alice = new RTCPeerConnection(serverless)
+socket.on('full', function(room) {
+  console.log('Message from client: Room ' + room + ' is full :^(')
+})
 
-	alice.onicecandidate = (event) => {
-		bob.addIceCandidate(new RTCIceCandidate(event.candidate))
-	}
+socket.on('ipaddr', function(ipaddr) {
+  console.log('Message from client: Server IP address is ' + ipaddr)
+})
 
-	bob = new RTCPeerConnection(serverless)
-	bob.onicecandidate = () => {
-		alice.addIceCandidate(new RTCIceCandidate(event.candidate))
-	}
+socket.on('joined', function(room, clientId) {
+  isInitiator = false
+})
 
-	bob.onaddstream = (event) => {
-		screen.srcObject = event.stream
-	}
-
-	alice.addStream(localStream)
-	alice.createOffer({
-		offerToReceiveVideo: 1,
-		offerToReceiveAudio: 1,
-	}).then((offerDesc) => {
-		alice.setLocalDescription(offerDesc)
-		return bob.setRemoteDescription(offerDesc)
-	}).then(() => {
-		return bob.createAnswer()
-	}).then(answerDesc => {
-		bob.setLocalDescription(answerDesc)
-		alice.setRemoteDescription(answerDesc)
-	})
-}
-
-const hang = () => {
-	alice.close()
-	bob.close()
-}
-
-document.querySelector('#btn-call').addEventListener('click', call)
-document.querySelector('#btn-hang').addEventListener('click', hang)
-init()
+socket.on('log', function(array) {
+  console.log.apply(console, array)
+})
